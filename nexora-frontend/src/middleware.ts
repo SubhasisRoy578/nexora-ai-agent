@@ -1,23 +1,22 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 const isProtected = createRouteMatcher(['/chat(.*)', '/dashboard(.*)'])
-const isPublic = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)'])
 
-export default clerkMiddleware((auth, req) => {
-  const { userId } = auth()
-  const { pathname } = req.nextUrl
+const publicClerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-  // Logged in + hitting landing page → go to chat
-  if (userId && pathname === '/') {
-    return NextResponse.redirect(new URL('/chat', req.url))
-  }
+const authMiddleware = publicClerkKey
+  ? clerkMiddleware((auth, req) => {
+      const { userId } = auth()
 
-  // Not logged in + hitting protected route → go to landing
-  if (!userId && isProtected(req)) {
-    return NextResponse.redirect(new URL('/', req.url))
-  }
-})
+      // The root route is the functional Nexora workspace for both guest and signed-in users.
+      if (!userId && isProtected(req)) {
+        return NextResponse.redirect(new URL('/', req.url))
+      }
+    })
+  : (req: NextRequest) => NextResponse.next()
+
+export default authMiddleware
 
 export const config = {
   matcher: ['/((?!_next|.*\\..*).*)'],

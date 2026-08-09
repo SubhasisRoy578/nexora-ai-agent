@@ -2,9 +2,9 @@
 Nexora AI — FastAPI entry point.
 Optimized for Render free tier (512 MB RAM).
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from pathlib import Path
@@ -29,10 +29,18 @@ app = FastAPI(
     description="Nexora AI — RAG-powered chat with persistent PostgreSQL storage",
 )
 
+allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOW_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if not allowed_origins:
+    allowed_origins = ["*"] if os.environ.get("APP_ENV", "development").lower() == "development" else []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allowed_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,7 +85,7 @@ app.include_router(learning_router, prefix="/api/learning", tags=["Learning"])
 app.include_router(websocket_router, prefix="/api/websocket", tags=["Websocket"])
 app.include_router(browser_router, prefix="/api/browser", tags=["Browser"])
 
-print("[OK] All 10 simplified routers registered successfully")
+logger.info("routers_registered", extra={"router_count": 10})
 
 
 # ── Static / Frontend ──────────────────────────────────────────────────────────
@@ -91,9 +99,28 @@ try:
         async def frontend():
             return FileResponse(FRONTEND_PATH)
 
-        print("[OK] Static files mounted")
+        logger.info("static_files_mounted")
 except Exception as e:
-    print(f"[WARN] Static files skipped: {e}")
+    logger.warning("static_files_skipped", extra={"error_type": type(e).__name__})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    from app.core.security import sanitize_error
+
+    request_id = getattr(request.state, "request_id", None)
+    logger.exception(
+        "unhandled_request_error",
+        extra={"path": request.url.path, "request_id": request_id},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "request_id": request_id,
+            "error": sanitize_error(exc) if _is_debug else None,
+        },
+    )
 
 
 # ── Health & Info ──────────────────────────────────────────────────────────────
@@ -151,4 +178,4 @@ if _is_debug:
             "capabilities": gateway.get_capabilities(),
         }
 
-    logger.info("[OK] Internal debug endpoints registered (/_internal/ai/*)")
+    logger.info("[OK] Internal debug endpoints registered (/_internal/ai/*)")

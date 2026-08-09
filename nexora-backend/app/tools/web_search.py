@@ -5,8 +5,14 @@
 # Always injects current year for freshness
 # ==================================================
 
-from duckduckgo_search import DDGS
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
 
 
 CURRENT_YEAR = datetime.utcnow().year
@@ -29,6 +35,9 @@ def search_web(
         fresh_query = query
 
     results = []
+    if DDGS is None:
+        logger.info("duckduckgo_search_not_installed; web search disabled")
+        return results
 
     # --- Primary: DuckDuckGo text search ---
     try:
@@ -52,7 +61,7 @@ def search_web(
             return results
 
     except Exception as e:
-        print(f"[WebSearch] DDG text search failed: {e}")
+        logger.warning("web_search_text_failed", extra={"error_type": type(e).__name__})
 
     # --- Fallback: DuckDuckGo news search ---
     try:
@@ -77,7 +86,7 @@ def search_web(
             return results
 
     except Exception as e:
-        print(f"[WebSearch] DDG news fallback failed: {e}")
+        logger.warning("web_search_news_failed", extra={"error_type": type(e).__name__})
 
     return []
 

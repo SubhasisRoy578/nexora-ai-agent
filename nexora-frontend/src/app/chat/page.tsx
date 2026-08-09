@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useCallback, useState } from 'react'
 import { useUser, useAuth } from '@clerk/nextjs'
 import toast from 'react-hot-toast'
@@ -25,7 +27,7 @@ export default function ChatPage() {
     let fileContext = ''
     if (files.length) {
       try {
-        const uploads = await Promise.all(files.map(f => uploadDocument(f, token)))
+        const uploads = await Promise.all(files.map(f => uploadDocument(f, token ?? undefined)))
         fileContext = uploads.map(u => `[Uploaded: ${u.name}]`).join(' ')
         toast.success(`${files.length} file(s) uploaded`)
       } catch (err) {
@@ -51,7 +53,7 @@ export default function ChatPage() {
 
     let buffer = ''
     try {
-      for await (const chunk of streamChat(fullMessage, ['rag'], token)) {
+      for await (const chunk of streamChat(fullMessage, ['rag'], token ?? undefined)) {
         buffer += chunk
         if (assistantId) {
           updateMessage(assistantId, { content: buffer, isStreaming: true })
@@ -70,10 +72,18 @@ export default function ChatPage() {
     }
   }, [isStreaming, getToken, addMessage, updateMessage])
 
+  const chatWindowMessages = messages.map((message) => ({
+    id: message.id,
+    role: message.type === 'user' ? 'user' as const : 'assistant' as const,
+    content: message.content,
+    isStreaming: message.isStreaming,
+    error: message.error,
+  }))
+
   return (
     <WorkspaceLayout>
       <section style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <ChatWindow messages={messages} />
+        <ChatWindow messages={chatWindowMessages} />
         <ChatInput onSend={handleSend} disabled={isStreaming} />
       </section>
     </WorkspaceLayout>

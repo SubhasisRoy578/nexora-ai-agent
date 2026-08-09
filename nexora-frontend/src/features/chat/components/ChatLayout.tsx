@@ -48,7 +48,7 @@ export default function ChatLayout() {
         try {
           const uploadResults = await Promise.all(
             files.map(async (file) => {
-              const result = await uploadDocument(file, token);
+              const result = await uploadDocument(file, token ?? undefined);
               return `[Uploaded: ${result.name || file.name}]`;
             })
           );
@@ -80,7 +80,7 @@ export default function ChatLayout() {
 
       try {
         const tools = ['rag'];
-        for await (const chunk of streamChat(fullMessage, tools, token)) {
+        for await (const chunk of streamChat(fullMessage, tools, token ?? undefined)) {
           accumulatedResponse += chunk;
           updateMessage(assistantMessageId, {
             content: accumulatedResponse,

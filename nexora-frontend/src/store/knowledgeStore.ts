@@ -33,7 +33,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set) => ({
   fetchDocs: async () => {
     set({ loading: true, error: null })
     try {
-      const data = await getKnowledge()
+      const data = await getKnowledge() as Document[]
       set({ docs: data })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to fetch docs'

@@ -1,34 +1,80 @@
 // src/lib/api.ts
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const BASE = API_BASE
 
 const getHeaders = (token?: string) => ({
   'Content-Type': 'application/json',
-  ...(token && { 'Authorization': `Bearer ${token}` }),
+  ...(token && { Authorization: `Bearer ${token}` }),
 })
 
-// ──── CHAT (Streaming Generator) ────
+async function fetchJsonWithFallback<T>(paths: string[], init: RequestInit): Promise<T> {
+  let lastError: unknown
+  for (const path of paths) {
+    try {
+      const res = await fetch(`${BASE}${path}`, init)
+      if (!res.ok) {
+        lastError = new Error(`Request failed: ${res.status}`)
+        continue
+      }
+      return res.json() as Promise<T>
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('API request failed')
+}
+
+export interface ChatApiResponse {
+  success?: boolean
+  response?: string
+  ai_response?: string
+  provider_used?: string
+  provider?: string
+  sources?: string[]
+  history_count?: number
+}
+
+// ──── CHAT (Streaming-compatible Generator) ────
 export async function* streamChat(
   message: string,
-  tools: string[],
-  token?: string
+  tools: string[] = [],
+  token?: string,
+  userId = 'anonymous',
+  provider?: string
 ) {
+  const payload = { user_id: userId, message, tools, provider }
+
   const res = await fetch(`${BASE}/api/chat`, {
     method: 'POST',
     headers: getHeaders(token),
-    body: JSON.stringify({ message, tools }),
+    body: JSON.stringify(payload),
   })
 
-  if (!res.ok) throw new Error(`Chat error: ${res.status}`)
+  if (res.ok && res.body) {
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) {
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        yield decoder.decode(value)
+      }
+      return
+    }
 
-  const reader = res.body?.getReader()
-  const decoder = new TextDecoder()
-
-  while (true) {
-    const { done, value } = await reader!.read()
-    if (done) break
-    yield decoder.decode(value)
+    const data = (await res.json()) as ChatApiResponse
+    yield data.response ?? data.ai_response ?? ''
+    return
   }
+
+  const fallback = await fetchJsonWithFallback<ChatApiResponse>(['/api/chat/chat', '/chat/'], {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify(payload),
+  })
+  yield fallback.response ?? fallback.ai_response ?? ''
 }
 
 // ──── UPLOAD ────
@@ -38,7 +84,7 @@ export const uploadDocument = async (file: File, token?: string) => {
 
   const res = await fetch(`${BASE}/api/upload`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token || ''}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   })
 
@@ -47,108 +93,63 @@ export const uploadDocument = async (file: File, token?: string) => {
 }
 
 // ──── AGENTS ────
-export const getAgents = async (token?: string) => {
-  const res = await fetch(`${BASE}/api/agents`, {
-    headers: getHeaders(token),
-  })
-  if (!res.ok) throw new Error(`Agents error: ${res.status}`)
-  return res.json()
-}
+export const getAgents = async (token?: string) => fetchJsonWithFallback(['/api/agents', '/api/agents/tools'], { headers: getHeaders(token) })
 
-export const runAgent = async (
-  agentId: string,
-  task: string,
-  token?: string
-) => {
-  const res = await fetch(`${BASE}/api/agents/run`, {
+export const runAgent = async (agentId: string, task: string, token?: string) =>
+  fetchJsonWithFallback(['/api/agents/run', '/api/agents/run/stream'], {
     method: 'POST',
     headers: getHeaders(token),
     body: JSON.stringify({ agent_id: agentId, task }),
   })
-  if (!res.ok) throw new Error(`Run agent error: ${res.status}`)
-  return res.json()
-}
 
 // ──── KNOWLEDGE ────
-export const getKnowledge = async (token?: string) => {
-  const res = await fetch(`${BASE}/api/knowledge`, {
-    headers: getHeaders(token),
-  })
-  if (!res.ok) throw new Error(`Knowledge error: ${res.status}`)
-  return res.json()
-}
+export const getKnowledge = async (token?: string) => fetchJsonWithFallback(['/api/knowledge', '/api/rag/documents'], { headers: getHeaders(token) })
 
-export const deleteDoc = async (docId: string, token?: string) => {
-  const res = await fetch(`${BASE}/api/knowledge/${docId}`, {
+export const deleteDoc = async (docId: string, token?: string) =>
+  fetchJsonWithFallback([`/api/knowledge/${docId}`, `/api/rag/documents/${docId}`], {
     method: 'DELETE',
     headers: getHeaders(token),
   })
-  if (!res.ok) throw new Error(`Delete error: ${res.status}`)
-  return res.json()
-}
 
 // ──── ANALYTICS ────
-export const getAnalytics = async (token?: string) => {
-  const res = await fetch(`${BASE}/api/analytics`, {
-    headers: getHeaders(token),
-  })
-  if (!res.ok) throw new Error(`Analytics error: ${res.status}`)
-  return res.json()
-}
+export const getAnalytics = async (token?: string) => fetchJsonWithFallback(['/api/analytics', '/api/analytics/dashboard'], { headers: getHeaders(token) })
 
 // ──── WEBSOCKET (Agent Activity) ────
 export const connectAgentSocket = (
   onMessage: (data: any) => void,
   onError?: (e: Event) => void
 ) => {
-  // ✅ FIX: Use secure WebSocket for Render
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = process.env.NEXT_PUBLIC_API_URL || 'localhost:8000';
-  
-  // ✅ FIX: Remove protocol from host if it includes http://
-  const cleanHost = host.replace(/^https?:\/\//, '');
-  
-  const ws = new WebSocket(`${protocol}://${cleanHost}/ws/agent-activity`);
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const cleanHost = BASE.replace(/^https?:\/\//, '')
+  const ws = new WebSocket(`${protocol}://${cleanHost}/ws/agent-activity`)
 
-  ws.onopen = () => console.log('🟢 Agent socket connected');
   ws.onmessage = (e) => {
     try {
-      onMessage(JSON.parse(e.data));
-    } catch (err) {
-      console.error('Socket message parse error:', err);
+      onMessage(JSON.parse(e.data))
+    } catch {
+      onMessage(e.data)
     }
-  };
-  ws.onerror = (e) => {
-    console.error('🔴 Socket error:', e);
-    onError?.(e);
-  };
-  ws.onclose = () => console.log('🟡 Agent socket closed');
+  }
+  ws.onerror = (e) => onError?.(e)
+  return ws
+}
 
-  return ws;
-};
-// ============================================
-// ⭐ ADDITIONS FOR COMPATIBILITY (DO NOT REMOVE)
-// ============================================
-
-// Alias for uploadDocument to maintain compatibility
 export const uploadFile = uploadDocument
 
-// Export BASE for other files to use
-export const API_BASE = BASE
-
-// Streaming chat with callback interface (for ChatLayout)
 export async function streamChatWithCallback(params: {
   message: string
   tools: string[]
   token?: string
+  userId?: string
+  provider?: string
   onToken: (token: string) => void
   onDone: () => void
   onError: (err: string) => void
 }) {
-  const { message, tools, token, onToken, onDone, onError } = params
+  const { message, tools, token, userId, provider, onToken, onDone, onError } = params
 
   try {
-    for await (const chunk of streamChat(message, tools, token)) {
+    for await (const chunk of streamChat(message, tools, token, userId, provider)) {
       onToken(chunk)
     }
     onDone()
@@ -157,6 +158,12 @@ export async function streamChatWithCallback(params: {
   }
 }
 
-// Direct streamChat export for pages that import it directly
-// This is the same as the generator above, but exported as a named export
 export { streamChat as streamChatGenerator }
+
+export async function sendMessageToAI(message: string, model: string) {
+  const chunks: string[] = []
+  for await (const chunk of streamChat(message, [], undefined, 'anonymous', model)) {
+    chunks.push(chunk)
+  }
+  return { response: chunks.join('') }
+}

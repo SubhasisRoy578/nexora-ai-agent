@@ -1,23 +1,3 @@
-export async function sendMessageToAI(
-  message: string,
-  model: string
-) {
-  const response = await fetch(
-    "http://127.0.0.1:8000/chat",
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
-
-      body: JSON.stringify({
-        message,
-        model,
-      }),
-    }
-  );
-
-  return response.json();
-}
+// Backward-compatible service layer facade.
+// New code should import from '@/lib/api'; existing imports remain supported.
+export * from '@/lib/api'

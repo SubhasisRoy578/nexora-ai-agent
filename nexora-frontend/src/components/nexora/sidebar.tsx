@@ -1,7 +1,7 @@
 "use client"
 
 import { MessageSquarePlus, Search, MessagesSquare, Settings, X } from "lucide-react"
-import { NexoraLogo } from "./logo"
+import { NexoraLogo } from "@/components/shared/logo"
 import { cn } from "@/lib/utils"
 import type { ChatSession } from "@/lib/nexora-data"
 

@@ -26,9 +26,15 @@ export default function ChatWindow({
   const { messages: storeMessages, loading, setCurrentSessionId, currentSessionId } = useChatStore()
   const bottomRef = useRef<HTMLDivElement>(null)
   
-  // Use prop messages if provided, otherwise use store messages
-  const messages = propMessages || storeMessages
-  const activeMessages = Array.isArray(messages) ? messages : []
+  // Use prop messages if provided, otherwise adapt the canonical chat store shape.
+  const messages = propMessages ?? storeMessages.map((message) => ({
+    id: message.id,
+    role: message.type === 'user' ? 'user' as const : 'assistant' as const,
+    content: message.content,
+    isStreaming: message.isStreaming,
+    error: message.error,
+  }))
+  const activeMessages: Message[] = Array.isArray(messages) ? messages : []
   
   const sessionLoadedRef = useRef(false)
 
@@ -101,7 +107,7 @@ export default function ChatWindow({
             >
               {message.attachments && message.attachments.length > 0 && (
                 <div className="text-xs mb-2 opacity-70">
-                  📎 {message.attachments.map(a => a.name).join(', ')}
+                  📎 {message.attachments.map((a) => a.name).join(', ')}
                 </div>
               )}
               <div className="whitespace-pre-wrap">

@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs'
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
@@ -37,6 +38,8 @@ export const viewport: Viewport = {
   themeColor: '#0a0e1a',
 }
 
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_ZHVtbXktbmV4b3JhLmNsZXJrLmFjY291bnRzLmRldiQ'
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -48,8 +51,10 @@ export default function RootLayout({
       className={`${inter.variable} bg-background`}
     >
       <body className="font-sans antialiased">
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <ClerkProvider publishableKey={clerkPublishableKey}>
+          {children}
+          {process.env.NODE_ENV === 'production' && <Analytics />}
+        </ClerkProvider>
       </body>
     </html>
   )

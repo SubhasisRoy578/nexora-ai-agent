@@ -1,6 +1,8 @@
 // src/app/dashboard/chat/page.tsx
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { useUser, useAuth } from '@clerk/nextjs'
 import { useChatStore } from '@/store/chatStore'
@@ -44,7 +46,7 @@ export default function ChatPage() {
       try {
         const uploadResults = await Promise.all(
           files.map(async (file) => {
-            const result = await uploadDocument(file, token)
+            const result = await uploadDocument(file, token ?? undefined)
             return `[Uploaded: ${result.name || file.name}]`
           })
         )
@@ -77,7 +79,7 @@ export default function ChatPage() {
 
     try {
       const tools = ['rag']
-      for await (const chunk of streamChat(fullMessage, tools, token)) {
+      for await (const chunk of streamChat(fullMessage, tools, token ?? undefined)) {
         accumulatedResponse += chunk
         updateMessage(assistantMessageId, {
           content: accumulatedResponse,
