@@ -39,7 +39,7 @@ export const useAgentStore = create<AgentStore>((set) => ({
   fetchAgents: async () => {
     set({ loading: true, error: null })
     try {
-      const data = await getAgents()
+      const data = await getAgents() as Agent[]
       set({ agents: data })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to fetch agents'
@@ -52,7 +52,7 @@ export const useAgentStore = create<AgentStore>((set) => ({
   dispatch: async (agentId: string, task: string) => {
     set({ loading: true, error: null })
     try {
-      const result = await runAgent(agentId, task)
+      const result = await runAgent(agentId, task) as AgentTask
       set((s) => ({ tasks: [result, ...s.tasks] }))
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to dispatch agent'

@@ -27,7 +27,7 @@ export const useAnalyticsStore = create<AnalyticsStore>((set) => ({
   fetch: async () => {
     set({ loading: true, error: null })
     try {
-      const data = await getAnalytics()
+      const data = await getAnalytics() as Analytics
       set({ metrics: data })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to fetch analytics'

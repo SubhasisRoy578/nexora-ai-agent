@@ -154,7 +154,7 @@ function AgentPod({ agent, progress }: { agent: any; progress: number }) {
     queued:  { glow: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.20)', bar: 'var(--nx-amber)' },
     error:   { glow: 'rgba(239,68,68,0.08)',  border: 'rgba(239,68,68,0.20)',  bar: 'var(--nx-red)' },
   }
-  const c = colors[agent.status] ?? colors.idle
+  const c = colors[(agent.status as keyof typeof colors)] ?? colors.idle
 
   return (
     <div style={{
