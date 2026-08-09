@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Nexora — AI Operating System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+HTMLEOF
+
+cat dist-parcel/main.css >> bundle_final.html
+
+cat >> bundle_final.html << 'HTMLEOF2'
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+HTMLEOF2
+
+cat dist-parcel/main.js >> bundle_final.html
+
+cat >> bundle_final.html << 'HTMLEOF3'
+</script>
+</body>
+</html>
+HTMLEOF3
+
+wc -c bundle_final.html
+echo "Bundle created"
