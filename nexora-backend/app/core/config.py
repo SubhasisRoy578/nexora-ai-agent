@@ -5,12 +5,12 @@ class Settings(BaseSettings):
     # =========================================
     # DATABASE
     # =========================================
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///./nexora.db"
 
     # =========================================
     # AUTH
     # =========================================
-    SECRET_KEY: str = "supersecretkey"
+    SECRET_KEY: str = ""
 
     ALGORITHM: str = "HS256"
 
@@ -19,15 +19,15 @@ class Settings(BaseSettings):
     # =========================================
     # AI API KEYS
     # =========================================
-    GEMINI_API_KEY: str = "AIzaSyCieUfu0s7Teh_PoUWYPu_nIzLXfqhcpto"
+    GEMINI_API_KEY: str = ""
 
-    GROQ_API_KEY: str = "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"
+    GROQ_API_KEY: str = ""
 
-    OPENROUTER_API_KEY: str = "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"
+    OPENROUTER_API_KEY: str = ""
 
-    TAVILY_API_KEY: str = "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"
+    TAVILY_API_KEY: str = ""
 
-    HUGGINGFACE_API_KEY: str = "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"
+    HUGGINGFACE_API_KEY: str = ""
 
     ELEVENLABS_API_KEY: str = ""
 

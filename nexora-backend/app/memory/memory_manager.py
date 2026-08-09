@@ -5,8 +5,10 @@
 # ==================================================
 
 import asyncio
-from sentence_transformers import SentenceTransformer
+import logging
 from app.memory.memory_repository import memory_repository
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryManager:
@@ -27,15 +29,21 @@ class MemoryManager:
 
             try:
 
+                try:
+                    from sentence_transformers import SentenceTransformer
+                except ImportError:
+                    logger.info("sentence_transformers_not_installed; semantic memory disabled")
+                    MemoryManager._model = None
+                    return None
+
                 MemoryManager._model = SentenceTransformer(
                     "sentence-transformers/all-MiniLM-L6-v2"
                 )
-
-                print("Embedding model loaded")
+                logger.info("embedding_model_loaded")
 
             except Exception as e:
 
-                print(f"Embedding model unavailable: {e}")
+                logger.warning("embedding_model_unavailable", extra={"error_type": type(e).__name__})
                 MemoryManager._model = None
 
         return MemoryManager._model
@@ -84,7 +92,7 @@ class MemoryManager:
 
         except Exception as e:
 
-            print(f"[MemoryManager] store_memory error: {e}")
+            logger.warning("memory_store_failed", extra={"error_type": type(e).__name__})
 
     # ==================================================
     # STORE MEMORY ASYNC
@@ -155,7 +163,7 @@ class MemoryManager:
 
         except Exception as e:
 
-            print(f"[MemoryManager] search_memory error: {e}")
+            logger.warning("memory_search_failed", extra={"error_type": type(e).__name__})
             return []
 
     # ==================================================

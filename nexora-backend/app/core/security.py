@@ -9,7 +9,6 @@ Provides security utilities for:
 
 import re
 import logging
-from typing import str
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ def sanitize_user_input(text: str, max_length: int = 10000) -> str:
 
     # Truncate payload length to max_length
     if len(sanitized) > max_length:
-        logger.warning(f"[Security] Truncated user input from {len(sanitized)} to {max_length} characters")
+        logger.warning("user_input_truncated", extra={"original_length": len(sanitized), "max_length": max_length})
         sanitized = sanitized[:max_length]
 
     return sanitized.strip()
@@ -53,6 +52,9 @@ def sanitize_error(error: Exception) -> str:
     err_str = str(error)
     # Mask connection strings containing passwords
     err_str = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', err_str)
+    # Mask API keys/tokens commonly returned by SDKs or config errors
+    err_str = re.sub(r'(sk|gsk|AIza|tvly|hf)[A-Za-z0-9_\-]{8,}', r'\1***', err_str)
     # Mask filesystem absolute paths
     err_str = re.sub(r'[A-Za-z]:\\[^:\n\r]+', '[INTERNAL_PATH]', err_str)
+    err_str = re.sub(r'/(?:[A-Za-z0-9._-]+/)+[A-Za-z0-9._-]+', '[INTERNAL_PATH]', err_str)
     return err_str

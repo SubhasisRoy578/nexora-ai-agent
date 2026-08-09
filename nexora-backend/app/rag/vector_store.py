@@ -1,12 +1,14 @@
-from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    Distance,
-    VectorParams,
-    PointStruct
-)
-
 from functools import lru_cache
+import logging
 import uuid
+
+logger = logging.getLogger(__name__)
+try:
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import Distance, VectorParams, PointStruct
+except ImportError:
+    QdrantClient = None
+    Distance = VectorParams = PointStruct = None
 
 
 # ==================================================
@@ -15,10 +17,13 @@ import uuid
 
 @lru_cache(maxsize=1)
 def get_qdrant_client():
+    if QdrantClient is None:
+        logger.info("qdrant_client_not_installed; vector search disabled")
+        return None
     try:
         return QdrantClient(path="./qdrant_db")
     except Exception as e:
-        print(f"[QDRANT WARN] QdrantClient init skipped/locked: {e}")
+        logger.warning("qdrant_client_unavailable", extra={"error_type": type(e).__name__})
         return None
 
 
@@ -59,15 +64,11 @@ def initialize_qdrant():
                 )
             )
 
-            print(
-                f"Created collection: {COLLECTION_NAME}"
-            )
+            logger.info("qdrant_collection_created", extra={"collection": COLLECTION_NAME})
 
     except Exception as e:
 
-        print(
-            f"Qdrant Initialization Error: {e}"
-        )
+        logger.warning("qdrant_initialization_failed", extra={"error_type": type(e).__name__})
 
 
 # ==================================================
@@ -92,9 +93,7 @@ def debug_documents():
 
     except Exception as e:
 
-        print(
-            f"Debug Error: {e}"
-        )
+        logger.warning("qdrant_debug_failed", extra={"error_type": type(e).__name__})
 
         return []
 
@@ -152,15 +151,11 @@ def store_embeddings(
                 points=points
             )
 
-            print(
-                f"Stored {len(points)} chunks"
-            )
+            logger.info("qdrant_chunks_stored", extra={"count": len(points)})
 
     except Exception as e:
 
-        print(
-            f"Store Embeddings Error: {e}"
-        )
+        logger.warning("qdrant_store_embeddings_failed", extra={"error_type": type(e).__name__})
 
 
 # ==================================================
@@ -215,9 +210,8 @@ def search_documents(
 
     except Exception as e:
 
-        print(
-            f"Document Search Error: {e}"
-        )
+        logger.warning("qdrant_document_search_failed", extra={"error_type": type(e).__name__})
+        return []
 
         return []
 
@@ -272,4 +266,4 @@ def search(
         )
 
         return []
-
+
