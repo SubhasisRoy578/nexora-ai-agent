@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const TOOLS = [
   { id: 'rag',    icon: 'ti-database',    label: 'RAG',    defaultOn: true },
@@ -12,11 +13,13 @@ const TOOLS = [
 ]
 
 interface ChatInputProps {
-  onSend: (text: string, files: File[]) => void
+  onSend: (text: string, files: File[], tools: string[]) => void
+  onStop?: () => void
   disabled?: boolean
+  isStreaming?: boolean
 }
 
-export default function ChatInput({ onSend, disabled = false }: ChatInputProps) {
+export default function ChatInput({ onSend, onStop, disabled = false, isStreaming = false }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [activeTools, setActiveTools] = useState<Set<string>>(
@@ -47,7 +50,7 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
 
   function handleSend() {
     if ((!value.trim() && selectedFiles.length === 0) || disabled) return
-    onSend(value.trim(), selectedFiles)
+    onSend(value.trim(), selectedFiles, Array.from(activeTools))
     setValue('')
     setSelectedFiles([])
     if (textareaRef.current) {
@@ -80,16 +83,27 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
       borderTop: '1px solid var(--nx-border, #1E2433)',
     }}>
       {/* Selected files preview */}
+      <AnimatePresence>
       {selectedFiles.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 10 }}
+          style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}
+        >
           {selectedFiles.map((file, idx) => (
-            <div key={idx} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(59,130,246,0.1)',
-              border: '1px solid rgba(59,130,246,0.2)',
-              borderRadius: 4, padding: '2px 8px',
-              fontSize: 10, fontFamily: 'monospace',
-            }}>
+            <motion.div 
+              key={idx} 
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'rgba(59,130,246,0.1)',
+                border: '1px solid rgba(59,130,246,0.2)',
+                borderRadius: 4, padding: '2px 8px',
+                fontSize: 10, fontFamily: 'monospace',
+              }}
+            >
               📎 {file.name} ({(file.size / 1024).toFixed(0)} KB)
               <button 
                 onClick={() => removeFile(idx)} 
@@ -97,20 +111,24 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
               >
                 ✕
               </button>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Tool chips */}
       <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
         {TOOLS.map(tool => {
           const on = activeTools.has(tool.id)
           return (
-            <button
+            <motion.button
               key={tool.id}
               onClick={() => toggleTool(tool.id)}
               aria-pressed={on}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
               style={{
                 height: 22, padding: '0 8px', borderRadius: 4, cursor: 'pointer',
                 background: on ? 'rgba(59,130,246,0.10)' : 'rgba(255,255,255,0.04)',
@@ -122,7 +140,7 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
             >
               <i className={`ti ${tool.icon}`} style={{ fontSize: 10 }} />
               {tool.label}
-            </button>
+            </motion.button>
           )
         })}
       </div>
@@ -147,18 +165,36 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
             maxHeight: 120, fontFamily: 'inherit',
           }}
         />
-        <button
-          onClick={handleSend}
-          disabled={(!value.trim() && selectedFiles.length === 0) || disabled}
-          style={{
-            width: 30, height: 30, borderRadius: 7, border: 'none',
-            background: (value.trim() || selectedFiles.length) && !disabled ? '#22d3ee' : 'rgba(34,211,238,0.25)',
-            color: '#000', cursor: (value.trim() || selectedFiles.length) && !disabled ? 'pointer' : 'default',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          ↑
-        </button>
+        {isStreaming ? (
+          <motion.button
+            onClick={onStop}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            style={{
+              width: 30, height: 30, borderRadius: 7, border: 'none',
+              background: '#ef4444',
+              color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ■
+          </motion.button>
+        ) : (
+          <motion.button
+            onClick={handleSend}
+            disabled={(!value.trim() && selectedFiles.length === 0) || disabled}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            style={{
+              width: 30, height: 30, borderRadius: 7, border: 'none',
+              background: (value.trim() || selectedFiles.length) && !disabled ? '#22d3ee' : 'rgba(34,211,238,0.25)',
+              color: '#000', cursor: (value.trim() || selectedFiles.length) && !disabled ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ↑
+          </motion.button>
+        )}
       </div>
 
       <input 

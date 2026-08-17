@@ -1,5 +1,7 @@
 // src/lib/api.ts
 
+import { logger } from './logger'
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const BASE = API_BASE
 
@@ -8,20 +10,36 @@ const getHeaders = (token?: string) => ({
   ...(token && { Authorization: `Bearer ${token}` }),
 })
 
-async function fetchJsonWithFallback<T>(paths: string[], init: RequestInit): Promise<T> {
+const DEFAULT_TIMEOUT_MS = 30000 // 30 seconds
+
+async function fetchJsonWithFallback<T>(paths: string[], init: RequestInit, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   let lastError: unknown
+  
   for (const path of paths) {
     try {
-      const res = await fetch(`${BASE}${path}`, init)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort('TimeoutError'), timeoutMs)
+      
+      const res = await fetch(`${BASE}${path}`, {
+        ...init,
+        signal: init.signal || controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+
       if (!res.ok) {
         lastError = new Error(`Request failed: ${res.status}`)
+        logger.warn(`API fallback failed for ${path}`, { status: res.status })
         continue
       }
       return res.json() as Promise<T>
     } catch (error) {
       lastError = error
+      logger.warn(`API request error for ${path}`, { error })
     }
   }
+  
+  logger.error('All API fallbacks failed', { paths, error: lastError })
   throw lastError instanceof Error ? lastError : new Error('API request failed')
 }
 
@@ -41,7 +59,8 @@ export async function* streamChat(
   tools: string[] = [],
   token?: string,
   userId = 'anonymous',
-  provider?: string
+  provider?: string,
+  abortSignal?: AbortSignal
 ) {
   const payload = { user_id: userId, message, tools, provider }
 
@@ -49,6 +68,7 @@ export async function* streamChat(
     method: 'POST',
     headers: getHeaders(token),
     body: JSON.stringify(payload),
+    signal: abortSignal,
   })
 
   if (res.ok && res.body) {
@@ -73,6 +93,7 @@ export async function* streamChat(
     method: 'POST',
     headers: getHeaders(token),
     body: JSON.stringify(payload),
+    signal: abortSignal,
   })
   yield fallback.response ?? fallback.ai_response ?? ''
 }
@@ -82,14 +103,22 @@ export const uploadDocument = async (file: File, token?: string) => {
   const form = new FormData()
   form.append('file', file)
 
-  const res = await fetch(`${BASE}/api/upload`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: form,
-  })
+  try {
+    const res = await fetch(`${BASE}/api/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: form,
+    })
 
-  if (!res.ok) throw new Error(`Upload error: ${res.status}`)
-  return res.json()
+    if (!res.ok) {
+      logger.error('Upload failed', { status: res.status, fileName: file.name })
+      throw new Error(`Upload error: ${res.status}`)
+    }
+    return res.json()
+  } catch (error) {
+    logger.error('Upload request exception', { error, fileName: file.name })
+    throw error
+  }
 }
 
 // ──── AGENTS ────

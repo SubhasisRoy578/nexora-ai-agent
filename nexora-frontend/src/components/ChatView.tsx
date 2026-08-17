@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useChatStore } from '../store/chatStore'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const CHIPS = [
   { id: 'rag', label: 'RAG', cls: 'chip-rag' },
@@ -40,36 +41,56 @@ export default function ChatView() {
 
       <div className="chat-messages">
         <div className="chat-messages-inner">
-          {messages.map((m) =>
-            m.type === 'user' ? (
-              <div key={m.id} className="msg-user">
-                <div className="msg-user-bubble">{m.content}</div>
-              </div>
-            ) : (
-              <div key={m.id} className="msg-ai">
-                <div className="msg-avatar">N</div>
-                <div className="msg-ai-body">
-                  {m.tools && (
-                    <div className="msg-ai-tags">
-                      {m.tools.map((t) => (
-                        <span key={t} className={`badge badge-${t.toLowerCase()}`}>
-                          {t.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="msg-ai-content">{m.content}</div>
-                </div>
-              </div>
-            )
-          )}
+          <AnimatePresence initial={false}>
+            {messages.map((m) =>
+              m.type === 'user' ? (
+                <motion.div 
+                  key={m.id} 
+                  className="msg-user"
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                  <div className="msg-user-bubble">{m.content}</div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key={m.id} 
+                  className="msg-ai"
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                  <div className="msg-avatar">N</div>
+                  <div className="msg-ai-body">
+                    {m.tools && (
+                      <div className="msg-ai-tags">
+                        {m.tools.map((t) => (
+                          <span key={t} className={`badge badge-${t.toLowerCase()}`}>
+                            {t.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="msg-ai-content">{m.content}</div>
+                  </div>
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
           {loading && (
-            <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '8px' }}>
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '8px' }}
+            >
               ✦ Thinking...
-            </div>
+            </motion.div>
           )}
           {error && (
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
               style={{
                 background: 'var(--accent-red-dim)',
                 color: 'var(--accent-red)',
@@ -80,7 +101,7 @@ export default function ChatView() {
               }}
             >
               {error}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
@@ -89,13 +110,16 @@ export default function ChatView() {
         <div className="chat-input-wrap">
           <div className="tool-chips">
             {CHIPS.map((c) => (
-              <div
+              <motion.div
                 key={c.id}
                 className={`tool-chip ${c.cls} ${active.includes(c.id) ? 'active' : ''}`}
                 onClick={() => toggle(c.id)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 {c.label}
-              </div>
+              </motion.div>
             ))}
           </div>
           <div className="chat-input-box">
@@ -113,11 +137,17 @@ export default function ChatView() {
               }}
               disabled={loading}
             />
-            <div className="chat-send-btn" onClick={handleSend} style={{ opacity: loading ? 0.5 : 1 }}>
+            <motion.div 
+              className="chat-send-btn" 
+              onClick={handleSend} 
+              style={{ opacity: loading ? 0.5 : 1 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M13 1L1 7l5 1.5L7 13l6-12z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
               </svg>
-            </div>
+            </motion.div>
           </div>
           <div className="chat-hint">↑ Upload to knowledge base · ⌘↵ Run agent · ⌘K command palette</div>
         </div>

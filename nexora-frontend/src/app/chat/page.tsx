@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef } from 'react'
 import { useUser, useAuth } from '@clerk/nextjs'
 import toast from 'react-hot-toast'
 import ChatWindow from '../../features/chat/components/ChatWindow'
@@ -16,12 +16,14 @@ export default function ChatPage() {
   const { getToken } = useAuth()
   const { addMessage, updateMessage, messages } = useChatStore()
   const [isStreaming, setIsStreaming] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
-  const handleSend = useCallback(async (text: string, files: File[]) => {
+  const handleSend = useCallback(async (text: string, files: File[], tools: string[] = ['rag']) => {
     if (isStreaming) return
     setIsStreaming(true)
 
     const token = await getToken()
+    const userId = user?.id ?? 'anonymous'
 
     // Upload files
     let fileContext = ''
@@ -41,36 +43,36 @@ export default function ChatPage() {
     addMessage({ type: 'user', content: fullMessage })
 
     // Add assistant placeholder
-    addMessage({ 
+    const assistantId = addMessage({
       type: 'ai',
-      content: '', 
-      isStreaming: true 
+      content: '',
+      isStreaming: true
     })
-
-    // Get the ID of the last message (the one we just added)
-    const currentMessages = useChatStore.getState().messages
-    const assistantId = currentMessages[currentMessages.length - 1]?.id
 
     let buffer = ''
     try {
-      for await (const chunk of streamChat(fullMessage, ['rag'], token ?? undefined)) {
+      abortRef.current = new AbortController()
+      for await (const chunk of streamChat(fullMessage, tools, token ?? undefined, userId, undefined, abortRef.current.signal)) {
         buffer += chunk
-        if (assistantId) {
-          updateMessage(assistantId, { content: buffer, isStreaming: true })
-        }
+        updateMessage(assistantId, { content: buffer, isStreaming: true })
       }
-      if (assistantId) {
-        updateMessage(assistantId, { content: buffer || 'Done.', isStreaming: false })
-      }
+      updateMessage(assistantId, { content: buffer || 'Done.', isStreaming: false })
     } catch (err) {
-      if (assistantId) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        updateMessage(assistantId, { content: buffer + '\n\n*(Generation stopped)*', isStreaming: false })
+        toast('Generation stopped', { icon: '🛑' })
+      } else {
         updateMessage(assistantId, { content: 'Error processing request', isStreaming: false, error: true })
+        toast.error('Failed to get response')
       }
-      toast.error('Failed to get response')
     } finally {
       setIsStreaming(false)
     }
-  }, [isStreaming, getToken, addMessage, updateMessage])
+  }, [isStreaming, getToken, user, addMessage, updateMessage])
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const chatWindowMessages = messages.map((message) => ({
     id: message.id,
@@ -84,7 +86,7 @@ export default function ChatPage() {
     <WorkspaceLayout>
       <section style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <ChatWindow messages={chatWindowMessages} />
-        <ChatInput onSend={handleSend} disabled={isStreaming} />
+        <ChatInput onSend={handleSend} onStop={handleStop} disabled={isStreaming} isStreaming={isStreaming} />
       </section>
     </WorkspaceLayout>
   )

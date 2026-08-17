@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, User, Bot, AlertCircle } from 'lucide-react';
+import { Copy, Check, User, Bot, AlertCircle, RotateCw, Loader2, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useChatStore } from '@/store/chatStore';
 
@@ -223,6 +223,45 @@ const MessageBubble = memo(function MessageBubble({ message }: Props) {
                   remarkPlugins={[remarkGfm]}
                   components={{
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    blockquote({ children, ...props }: any) {
+                      const extractText = (node: any): string => {
+                        if (typeof node === 'string') return node;
+                        if (Array.isArray(node)) return node.map(extractText).join('');
+                        if (node?.props?.children) return extractText(node.props.children);
+                        return '';
+                      };
+                      
+                      const rawText = extractText(children).trim();
+                      const isAgentStatus = rawText.startsWith('🔍') || rawText.startsWith('📚') || rawText.startsWith('🛠️') || rawText.startsWith('🧠') || rawText.startsWith('🤖');
+                      
+                      if (isAgentStatus) {
+                        return (
+                          <div
+                            className="flex items-center gap-3 my-3 p-3 rounded-xl border"
+                            style={{
+                              background: 'rgba(59,130,246,0.05)',
+                              borderColor: 'rgba(59,130,246,0.15)'
+                            }}
+                          >
+                            <Loader2 size={14} className="animate-spin text-blue-400 flex-shrink-0" />
+                            <span className="text-xs font-medium text-blue-300">
+                              {rawText.replace(/[\*\_\`]/g, '')}
+                            </span>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <blockquote 
+                          className="border-l-2 pl-4 my-2 italic"
+                          style={{ borderColor: 'var(--border)', color: 'var(--text-3)' }}
+                          {...props}
+                        >
+                          {children}
+                        </blockquote>
+                      );
+                    },
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     code({ inline, className, children, ...props }: any) {
                       const match = /language-(\w+)/.exec(className || '');
                       const codeStr = String(children).replace(/\n$/, '');
@@ -287,6 +326,20 @@ const MessageBubble = memo(function MessageBubble({ message }: Props) {
               title="Copy response"
             >
               <Copy size={11} />
+            </button>
+          )}
+          {isUser && message.content && !message.isStreaming && (
+            <button
+              onClick={() => {
+                // To implement retry we need to pass down onRetry, but since it's not in props,
+                // we can dispatch a custom event or simply dispatch to window if needed.
+                // For now, we will just dispatch a custom event that ChatLayout can listen to.
+                window.dispatchEvent(new CustomEvent('nexora:retry', { detail: message.content }));
+              }}
+              className="p-0.5 rounded transition-colors hover:text-[var(--accent)]"
+              title="Retry"
+            >
+              <RefreshCw size={11} />
             </button>
           )}
         </div>

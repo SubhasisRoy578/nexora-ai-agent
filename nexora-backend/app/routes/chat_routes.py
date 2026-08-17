@@ -20,71 +20,28 @@ class ChatRequest(BaseModel):
     user_id: str
     message: str
     provider: Optional[str] = None  # Allows forcing a specific provider
+    tools: Optional[list[str]] = None
 
 # ============================================
 # CHAT ENDPOINT
 # ============================================
 
+from fastapi.responses import StreamingResponse
+
 @router.post("/chat")
 async def chat(request: ChatRequest, db: Session = Depends(get_db)):
-    user_id = request.user_id
-    message = request.message
-
-    # 1. Retrieve recent messages from DB for conversation history
-    history = []
-    try:
-        history = get_recent_messages(db, user_id=user_id, limit=10)
-    except Exception as e:
-        print(f"[DB history error]: {e}")
-
-    # 2. Search for relevant context using RAG
-    rag_context = ""
-    sources = []
-    try:
-        rag_results = search_rag(db, message, top_k=3)
-        if rag_results:
-            filtered_results = [r for r in rag_results if r.get("similarity", 0) > 0.15]
-            if filtered_results:
-                rag_context = "\n---\n".join([r["text"] for r in filtered_results])
-                sources = list({r["filename"] for r in filtered_results})
-    except Exception as e:
-        print(f"[RAG Retrieval Error]: {e}")
-
-    # 3. Construct prompts
-    system_prompt = "You are Nexora AI, a helpful, intelligent AI assistant."
-    if rag_context:
-        system_prompt += (
-            f"\n\nContext from user's uploaded documents:\n{rag_context}\n\n"
-            f"Instructions: Answer the question using the context above when relevant. "
-            f"If the context doesn't contain the answer, use your general knowledge to answer, "
-            f"but clearly state that the answer was not found in the uploaded documents."
-        )
-
-    messages = [{"role": "system", "content": system_prompt}]
-    for msg in history:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": message})
-
-    # 4. Call the selected LLM provider via AI Gateway with fallback
-    try:
-        ai_response, provider_used = await gateway.get_chat_response(messages, request.provider)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM API error: {str(e)}")
-
-    # 5. Persist messages to database
-    try:
-        store_message(db, user_id, "user", message)
-        store_message(db, user_id, "assistant", ai_response)
-    except Exception as e:
-        print(f"[DB memory write error]: {e}")
-
-    return {
-        "success": True,
-        "response": ai_response,
-        "provider_used": provider_used,
-        "sources": sources,
-        "history_count": len(history)
-    }
+    from app.agents.orchestrator import AgentOrchestrator
+    
+    orchestrator = AgentOrchestrator()
+    
+    return StreamingResponse(
+        orchestrator.stream_run(
+            goal=request.message,
+            user_id=request.user_id,
+            provider=request.provider
+        ),
+        media_type="text/plain"
+    )
 
 # ============================================
 # HISTORY ENDPOINTS

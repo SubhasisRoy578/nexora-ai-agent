@@ -1,3 +1,5 @@
+import { motion } from 'framer-motion'
+
 // Define View type locally since '../App' doesn't exist
 type View = 'chat' | 'dashboard' | 'knowledge' | 'settings' | 'analytics' | 'agents' | 'code'
 
@@ -46,37 +48,60 @@ export default function Sidebar({ activeView, setActiveView, activeChat, setActi
       </div>
 
       <div className="sidebar-nav">
-        <button className="btn-new-chat" onClick={() => setActiveView('chat')}>
+        <motion.button 
+          className="btn-new-chat" 
+          onClick={() => setActiveView('chat')}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
           <span style={{ fontSize: '14px' }}>+</span> New session
-        </button>
+        </motion.button>
         <div style={{ height: '8px' }} />
         {NAV.map(n => (
-          <div key={n.id} className={`nav-item${activeView === n.id ? ' active' : ''}`} onClick={() => setActiveView(n.id as View)}>
+          <motion.div 
+            key={n.id} 
+            className={`nav-item${activeView === n.id ? ' active' : ''}`} 
+            onClick={() => setActiveView(n.id as View)}
+            whileHover={{ x: 4, backgroundColor: 'var(--bg-hover)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+          >
             <span style={{ fontSize: '14px', fontFamily: 'monospace' }}>{n.icon}</span>
             <span>{n.label}</span>
             {n.badge && <span className={`nav-badge${n.badgeActive ? ' active-badge' : ''}`}>{n.badge}</span>}
-          </div>
+          </motion.div>
         ))}
       </div>
 
       <div className="sidebar-section">
         <div className="sidebar-section-title">Projects</div>
         {PROJECTS.map(p => (
-          <div key={p.name} className="project-item">
+          <motion.div 
+            key={p.name} 
+            className="project-item"
+            whileHover={{ x: 4, backgroundColor: 'var(--bg-hover)' }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="project-dot" style={{ background: p.color }} />
             <span>{p.name}</span>
-          </div>
+          </motion.div>
         ))}
 
         <div className="sidebar-section-title" style={{ marginTop: '12px' }}>Recent chats</div>
         {CHATS.map(c => (
-          <div key={c.title} className={`chat-item${activeChat === c.title ? ' active' : ''}`} onClick={() => { setActiveChat(c.title); setActiveView('chat') }}>
+          <motion.div 
+            key={c.title} 
+            className={`chat-item${activeChat === c.title ? ' active' : ''}`} 
+            onClick={() => { setActiveChat(c.title); setActiveView('chat') }}
+            whileHover={{ x: 4, backgroundColor: 'var(--bg-hover)' }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="chat-title">{c.title}</div>
             <div className="chat-meta">
               <span className="chat-tag">{c.tag}</span>
               <span className="chat-time">{c.time}</span>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 

@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/nexora/sidebar"
 import { TopBar } from "@/components/nexora/top-bar"
 import { ChatArea } from "@/components/nexora/chat-area"
 import { ActivityPanel } from "@/components/nexora/activity-panel"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { streamChat } from "@/lib/api"
 import { useChatStore } from "@/store/chatStore"
 import {
@@ -177,15 +178,17 @@ function WorkspaceShell({ getToken, userId: currentUserId }: WorkspaceShellProps
   }, [activeId, activeSession, sessions])
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-background">
-      <Sidebar
-        sessions={sidebarSessions}
-        activeId={activeId}
-        onSelect={handleSelect}
-        onNewChat={handleNewChat}
-        mobileOpen={sidebarOpen}
-        onCloseMobile={() => setSidebarOpen(false)}
-      />
+    <div className="flex h-dvh overflow-hidden bg-background font-sans text-foreground">
+      <ErrorBoundary name="Sidebar">
+        <Sidebar
+          sessions={[activeSession]}
+          activeId={activeSession.id}
+          onSelect={handleSelect}
+          onNewChat={handleNewChat}
+          mobileOpen={sidebarOpen}
+          onCloseMobile={() => setSidebarOpen(false)}
+        />
+      </ErrorBoundary>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
@@ -197,23 +200,27 @@ function WorkspaceShell({ getToken, userId: currentUserId }: WorkspaceShellProps
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
           onToggleActivity={() => setActivityOpen((v) => !v)}
         />
-        <ChatArea
-          title={activeSession.messages.length === 0 ? "How can Nexora help?" : activeSession.title}
-          messages={activeSession.messages}
-          activeTools={activeTools}
-          onToggleTool={toggleTool}
-          onSend={handleSend}
-          busy={busy}
-        />
+        <ErrorBoundary name="ChatArea">
+          <ChatArea
+            title={activeSession.messages.length === 0 ? "How can Nexora help?" : activeSession.title}
+            messages={activeSession.messages}
+            activeTools={activeTools}
+            onToggleTool={toggleTool}
+            onSend={handleSend}
+            busy={busy}
+          />
+        </ErrorBoundary>
       </div>
 
-      <ActivityPanel
-        logs={logs}
-        busy={busy}
-        model={model.provider}
-        open={activityOpen}
-        onClose={() => setActivityOpen(false)}
-      />
+      <ErrorBoundary name="ActivityPanel">
+        <ActivityPanel
+          logs={logs}
+          busy={busy}
+          model={model.provider}
+          open={activityOpen}
+          onClose={() => setActivityOpen(false)}
+        />
+      </ErrorBoundary>
     </div>
   )
 }

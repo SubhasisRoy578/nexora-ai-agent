@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
@@ -9,6 +9,7 @@ import { streamChat, uploadDocument } from '@/lib/api';
 import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
 import ChatInput from './ChatInput';
+import { Menu } from 'lucide-react';
 
 export default function ChatLayout() {
   const { user } = useUser();
@@ -23,8 +24,24 @@ export default function ChatLayout() {
   } = useChatStore();
   
   const [isStreaming, setIsStreaming] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    typeof window !== 'undefined' ? window.innerWidth > 768 : true
+  );
+  const [isOffline, setIsOffline] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Offline detection
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    setIsOffline(!navigator.onLine);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
 
   // Create a session ID on mount
   useEffect(() => {
@@ -35,7 +52,7 @@ export default function ChatLayout() {
   }, [currentSessionId, setCurrentSessionId]);
 
   const handleSend = useCallback(
-    async (text: string, files: File[]) => {
+    async (text: string, files: File[], tools: string[] = []) => {
       if (isStreaming || (!text.trim() && files.length === 0)) return;
 
       const token = await getToken();
@@ -79,8 +96,8 @@ export default function ChatLayout() {
       setIsStreaming(true);
 
       try {
-        const tools = ['rag'];
-        for await (const chunk of streamChat(fullMessage, tools, token ?? undefined)) {
+        abortRef.current = new AbortController();
+        for await (const chunk of streamChat(fullMessage, tools, token ?? undefined, userId, undefined, abortRef.current.signal)) {
           accumulatedResponse += chunk;
           updateMessage(assistantMessageId, {
             content: accumulatedResponse,
@@ -93,13 +110,21 @@ export default function ChatLayout() {
           isStreaming: false,
         });
       } catch (error) {
-        console.error('Stream error:', error);
-        updateMessage(assistantMessageId, {
-          content: 'Sorry, an error occurred while processing your request.',
-          isStreaming: false,
-          error: true,
-        });
-        toast.error('Failed to get response');
+        if (error instanceof Error && error.name === 'AbortError') {
+          updateMessage(assistantMessageId, {
+            content: accumulatedResponse + '\n\n*(Generation stopped)*',
+            isStreaming: false,
+          });
+          toast('Generation stopped', { icon: '🛑' });
+        } else {
+          console.error('Stream error:', error);
+          updateMessage(assistantMessageId, {
+            content: 'Sorry, an error occurred while processing your request.',
+            isStreaming: false,
+            error: true,
+          });
+          toast.error('Failed to get response');
+        }
       } finally {
         setIsStreaming(false);
       }
@@ -107,20 +132,38 @@ export default function ChatLayout() {
     [isStreaming, getToken, user, currentSessionId, addMessage, updateMessage]
   );
 
-  // Convert messages to the format expected by ChatWindow
-  const formattedMessages = messages.map((msg: any) => ({
+  const handleStop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleRetry = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      handleSend(customEvent.detail, []);
+    };
+    window.addEventListener('nexora:retry', handleRetry);
+    return () => window.removeEventListener('nexora:retry', handleRetry);
+  }, [handleSend]);
+
+  // Memoize message mapping to prevent unnecessary ChatWindow re-renders
+  const formattedMessages = useMemo(() => messages.map((msg: any) => ({
     id: msg.id,
     role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
     content: msg.content,
     isStreaming: msg.isStreaming,
     error: msg.error,
-  }));
+  })), [messages]);
 
-  const sessionTitle = messages.find((m: any) => m.type === 'user')?.content?.slice(0, 42) ?? 'Nexora AI';
+  const sessionTitle = useMemo(
+    () => messages.find((m: any) => m.type === 'user')?.content?.slice(0, 42) ?? 'Nexora AI',
+    [messages]
+  );
 
   return (
     <div
-      className="flex h-screen overflow-hidden"
+      className="flex h-screen h-dvh overflow-hidden"
       style={{ background: 'var(--bg, #0A0C12)' }}
     >
       <Toaster
@@ -136,35 +179,51 @@ export default function ChatLayout() {
         }}
       />
 
-      <div className="relative flex-shrink-0" style={{ zIndex: 20 }}>
+      {/* Offline banner */}
+      {isOffline && (
+        <div className="offline-banner">⚡ You are offline — responses may fail</div>
+      )}
+
+      {/* Sidebar — hidden on mobile via CSS class */}
+      <div className="relative flex-shrink-0 sidebar-desktop-only" style={{ zIndex: 20 }}>
         <Sidebar />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Header — responsive padding & mobile hamburger */}
         <div
-          className="flex items-center justify-between px-6 py-3.5 border-b flex-shrink-0"
+          className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-3.5 border-b flex-shrink-0"
           style={{
             background: 'var(--surface, #11141C)',
             borderColor: 'var(--border, #1E2433)',
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile hamburger menu */}
+            <button
+              className="flex sm:hidden items-center justify-center w-8 h-8 rounded-lg"
+              style={{ background: 'var(--elevated, #1a1d28)', color: 'var(--text-2)' }}
+              onClick={() => setSidebarOpen(prev => !prev)}
+              aria-label="Toggle menu"
+            >
+              <Menu size={16} />
+            </button>
             {!sidebarOpen && (
               <div
-                className="w-7 h-7 rounded-xl flex items-center justify-center text-white text-sm font-bold"
+                className="hidden sm:flex w-7 h-7 rounded-xl items-center justify-center text-white text-sm font-bold"
                 style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
               >
                 N
               </div>
             )}
-            <div>
+            <div className="min-w-0">
               <h1
-                className="text-sm font-semibold leading-tight"
+                className="text-xs sm:text-sm font-semibold leading-tight truncate"
                 style={{ fontFamily: 'var(--font-display)', color: 'var(--text, #E5E7EB)' }}
               >
                 {sessionTitle}
               </h1>
-              <p className="text-[11px]" style={{ color: 'var(--text-3, #6B7280)' }}>
+              <p className="text-[10px] sm:text-[11px]" style={{ color: 'var(--text-3, #6B7280)' }}>
                 {messages.length} messages
               </p>
             </div>
@@ -174,10 +233,10 @@ export default function ChatLayout() {
             <div className="flex items-center gap-1.5">
               <div
                 className="w-1.5 h-1.5 rounded-full"
-                style={{ background: '#10b981' }}
+                style={{ background: isOffline ? '#ef4444' : '#10b981' }}
               />
-              <span className="text-[11px]" style={{ color: 'var(--text-3, #6B7280)' }}>
-                Connected
+              <span className="text-[10px] sm:text-[11px]" style={{ color: 'var(--text-3, #6B7280)' }}>
+                {isOffline ? 'Offline' : 'Connected'}
               </span>
             </div>
           </div>
@@ -188,8 +247,9 @@ export default function ChatLayout() {
           isLoading={loading || isStreaming}
         />
 
+        {/* Input area — responsive padding */}
         <div
-          className="flex-shrink-0 px-4 pb-4 pt-2 border-t"
+          className="flex-shrink-0 px-2 sm:px-4 pb-3 sm:pb-4 pt-1 sm:pt-2 border-t"
           style={{
             borderColor: 'var(--border, #1E2433)',
             background: 'var(--bg, #0A0C12)',
@@ -198,7 +258,9 @@ export default function ChatLayout() {
           <div className="max-w-3xl mx-auto w-full">
             <ChatInput
               onSend={handleSend}
-              disabled={isStreaming}
+              onStop={handleStop}
+              disabled={isStreaming || isOffline}
+              isStreaming={isStreaming}
             />
           </div>
         </div>

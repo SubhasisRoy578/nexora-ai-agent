@@ -149,13 +149,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ loading: true, error: null, currentSessionId: sessionId })
     try {
       // Fetch messages from backend API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sessions/${sessionId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/sessions/${sessionId}`, {
         headers: {
           'Content-Type': 'application/json',
         },
       })
       
-      if (!response.ok) throw new Error('Failed to load session')
+      if (!response.ok) {
+        throw new Error('Failed to load session')
+      }
       
       const data = await response.json()
       const loadedMessages: Message[] = data.messages.map((msg: any, index: number) => ({
@@ -170,6 +172,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set({ messages: loadedMessages, loading: false })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to load session'
+      
+      // We explicitly avoid importing logger directly here to prevent hydration issues
+      // if it runs in a context where node modules aren't fully resolved. 
+      // But we will use console.error strictly with strings, no full object traces.
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Session load error:', errMsg)
+      }
+      
       set({ error: errMsg, loading: false })
     }
   },

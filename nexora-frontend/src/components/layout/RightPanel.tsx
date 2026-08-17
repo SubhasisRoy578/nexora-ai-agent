@@ -127,7 +127,7 @@ function AgentCard({ agent }: { agent: any }) {
       setProgress((p: number) => Math.min(p + Math.random() * 1.5, 99))
     }, 2500)
     return () => clearInterval(t)
-  }, [agent?.status])
+  }, [agent, agent?.status])
 
   const statusStyle: Record<string, { bg: string; color: string; border: string }> = {
     running: { bg: 'rgba(16,185,129,0.10)', color: 'var(--nx-green)',  border: 'rgba(16,185,129,0.18)' },

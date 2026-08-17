@@ -2,6 +2,7 @@
 type View = 'chat' | 'dashboard' | 'knowledge' | 'settings' | 'analytics' | 'agents' | 'code'
 
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const VIEW_LABELS: Record<View, string> = {
   dashboard: 'Dashboard',
@@ -46,37 +47,67 @@ export default function TopBar({ activeView, rightPanelOpen, setRightPanelOpen, 
         </div>
       )}
       <div className="topbar-right">
-        <div className="topbar-cmd" onClick={onCommandOpen}>
+        <motion.div 
+          className="topbar-cmd" 
+          onClick={onCommandOpen}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
           <span>⌘K</span>
           <span style={{ opacity: 0.5 }}>Command</span>
-        </div>
-        <div className="model-pill" style={{ position: 'relative' }} onClick={() => setModelOpen(!modelOpen)}>
+        </motion.div>
+        <motion.div 
+          className="model-pill" 
+          style={{ position: 'relative' }} 
+          onClick={() => setModelOpen(!modelOpen)}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
           <span style={{ color: 'var(--accent-cyan)', fontSize: '10px' }}>◈</span>
           <span>{selectedModel}</span>
           <span style={{ opacity: 0.4 }}>▾</span>
-          {modelOpen && (
-            <div style={{ position: 'absolute', top: '110%', right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', zIndex: 100, minWidth: '180px', boxShadow: '0 12px 32px rgba(0,0,0,0.4)' }}>
-              {MODELS.map(m => (
-                <div key={m} style={{ padding: '8px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: m === selectedModel ? 'var(--accent-cyan)' : 'var(--text-secondary)', cursor: 'pointer', background: m === selectedModel ? 'var(--accent-cyan-dim)' : 'transparent' }}
-                  onClick={(e) => { e.stopPropagation(); setSelectedModel(m); setModelOpen(false) }}>
-                  {m}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className={`topbar-icon-btn${rightPanelOpen ? ' active-panel' : ''}`} onClick={() => setRightPanelOpen(!rightPanelOpen)} title="Toggle activity panel">
+          <AnimatePresence>
+            {modelOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                style={{ position: 'absolute', top: '110%', right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', zIndex: 100, minWidth: '180px', boxShadow: '0 12px 32px rgba(0,0,0,0.4)' }}>
+                {MODELS.map(m => (
+                  <motion.div key={m} style={{ padding: '8px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: m === selectedModel ? 'var(--accent-cyan)' : 'var(--text-secondary)', cursor: 'pointer', background: m === selectedModel ? 'var(--accent-cyan-dim)' : 'transparent' }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedModel(m); setModelOpen(false) }}
+                    whileHover={{ backgroundColor: 'var(--bg-hover)' }}>
+                    {m}
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+        <motion.div 
+          className={`topbar-icon-btn${rightPanelOpen ? ' active-panel' : ''}`} 
+          onClick={() => setRightPanelOpen(!rightPanelOpen)} 
+          title="Toggle activity panel"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
             <rect x="1" y="1" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.2"/>
             <line x1="10" y1="1" x2="10" y2="14" stroke="currentColor" strokeWidth="1.2"/>
           </svg>
-        </div>
-        <div className="topbar-icon-btn" title="Notifications">
+        </motion.div>
+        <motion.div 
+          className="topbar-icon-btn" 
+          title="Notifications"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
             <path d="M7.5 1.5a4 4 0 0 1 4 4v3l1 2H2.5l1-2v-3a4 4 0 0 1 4-4z" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M6 11.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2"/>
           </svg>
-        </div>
+        </motion.div>
       </div>
     </div>
   )

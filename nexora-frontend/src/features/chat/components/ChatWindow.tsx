@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo, useCallback } from 'react'
 import { useChatStore } from '@/store/chatStore'
+import { motion } from 'framer-motion'
+import MessageBubble from './MessageBubble'
 
 interface Message {
   id: string
@@ -18,23 +20,36 @@ interface ChatWindowProps {
   isLoading?: boolean
 }
 
+/**
+ * Check if reduced-motion is preferred (SSR-safe).
+ */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
 export default function ChatWindow({ 
   sessionId, 
   messages: propMessages, 
   isLoading = false 
 }: ChatWindowProps) {
   const { messages: storeMessages, loading, setCurrentSessionId, currentSessionId } = useChatStore()
+  const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const isNearBottom = useRef(true)
   
   // Use prop messages if provided, otherwise adapt the canonical chat store shape.
-  const messages = propMessages ?? storeMessages.map((message) => ({
-    id: message.id,
-    role: message.type === 'user' ? 'user' as const : 'assistant' as const,
-    content: message.content,
-    isStreaming: message.isStreaming,
-    error: message.error,
-  }))
-  const activeMessages: Message[] = Array.isArray(messages) ? messages : []
+  const activeMessages = useMemo(() => {
+    const messages = propMessages ?? storeMessages.map((message) => ({
+      id: message.id,
+      role: message.type === 'user' ? 'user' as const : 'assistant' as const,
+      content: message.content,
+      isStreaming: message.isStreaming,
+      error: message.error,
+      attachments: undefined,
+    }))
+    return Array.isArray(messages) ? messages : []
+  }, [propMessages, storeMessages])
   
   const sessionLoadedRef = useRef(false)
 
@@ -52,17 +67,33 @@ export default function ChatWindow({
     }
   }, [sessionId, currentSessionId, setCurrentSessionId])
 
+  // Smart auto-scroll: only scroll if user is near bottom
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const threshold = 150
+    isNearBottom.current = (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold
+  }, [])
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (isNearBottom.current) {
+      bottomRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth'
+      })
+    }
   }, [activeMessages])
 
-  // Show loading state
+  // Show loading state with skeleton
   if (isLoading || loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-          <p className="text-gray-400 text-sm">Loading messages...</p>
+        <div className="text-center w-full max-w-md px-6">
+          <div className="space-y-4">
+            <div className="skeleton h-10 w-3/4 mx-auto" />
+            <div className="skeleton h-6 w-1/2 mx-auto" />
+            <div className="skeleton h-16 w-full" />
+          </div>
+          <p className="text-gray-400 text-sm mt-4">Loading messages…</p>
         </div>
       </div>
     )
@@ -72,7 +103,12 @@ export default function ChatWindow({
   if (!activeMessages || activeMessages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center max-w-md px-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-center max-w-md px-6"
+        >
           <div className="text-5xl mb-4">💬</div>
           <h2 className="text-xl font-semibold mb-2">Welcome to Nexora AI</h2>
           <p className="text-gray-400 text-sm">
@@ -83,41 +119,20 @@ export default function ChatWindow({
               Session ID: {sessionId.slice(0, 8)}...
             </p>
           )}
-        </div>
+        </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-8">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 scrollbar-thin"
+    >
+      <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
         {activeMessages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : message.error
-                  ? 'bg-red-900/50 text-red-300 border border-red-700'
-                  : 'bg-gray-800 text-gray-100'
-              }`}
-            >
-              {message.attachments && message.attachments.length > 0 && (
-                <div className="text-xs mb-2 opacity-70">
-                  📎 {message.attachments.map((a) => a.name).join(', ')}
-                </div>
-              )}
-              <div className="whitespace-pre-wrap">
-                {message.content || (message.isStreaming && '...')}
-              </div>
-              {message.isStreaming && (
-                <span className="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse" />
-              )}
-            </div>
-          </div>
+          <MessageBubble key={message.id} message={message as any} />
         ))}
         <div ref={bottomRef} />
       </div>

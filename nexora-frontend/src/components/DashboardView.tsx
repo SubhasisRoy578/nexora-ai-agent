@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 
 // Define View type locally (since import from '../App' was failing)
 type View = 'chat' | 'dashboard' | 'knowledge' | 'settings' | 'analytics' | 'agents' | 'code'
@@ -109,19 +110,37 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
     { name: 'GPT-4o mini', pct: 8, color: 'var(--accent-amber)', tokens: '370K' },
   ]
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 }
+  }
+
   return (
     <div className="dash-view" style={{ padding: '24px', height: '100%', overflowY: 'auto' }}>
       <div className="dash-header" style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
           <div className="dash-title" style={{ fontSize: '24px', fontWeight: 600 }}>Dashboard</div>
-          <span className="badge badge-live" style={{
+          <motion.span 
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="badge badge-live" style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
             background: 'rgba(239,68,68,0.15)', color: '#ef4444'
           }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444' }} />
             LIVE
-          </span>
+          </motion.span>
         </div>
         <div className="dash-sub" style={{ fontSize: '13px', color: 'var(--nx-text-muted)' }}>
           Agent fleet & analytics · {loading ? 'Loading...' : 'Updated now'}
@@ -134,14 +153,18 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
           Loading metrics...
         </div>
       ) : metrics ? (
-        <>
+        <motion.div variants={containerVariants} initial="hidden" animate="show">
           {/* Metrics Row */}
-          <div className="metrics-row" style={{
+          <motion.div variants={itemVariants} className="metrics-row" style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px',
             marginBottom: '24px'
           }}>
             {METRICS_MAP.map((m) => (
-              <div key={m.key} className="metric-card" style={{
+              <motion.div 
+                key={m.key} 
+                className="metric-card" 
+                whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+                style={{
                 background: 'var(--nx-card)', border: '1px solid var(--nx-border)',
                 borderRadius: '12px', padding: '16px'
               }}>
@@ -151,25 +174,31 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
                 <div className="metric-value" style={{ fontSize: '28px', fontWeight: 600 }}>
                   {metrics[m.key as keyof Metrics]}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Agent Pods Section */}
-          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <motion.div variants={itemVariants} className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div className="section-title" style={{ fontSize: '16px', fontWeight: 600 }}>Agent Pods</div>
-            <button 
+            <motion.button 
               className="btn btn-ghost" 
+              whileHover={{ backgroundColor: 'var(--bg-hover)' }}
+              whileTap={{ scale: 0.95 }}
               style={{ fontSize: '11px', padding: '4px 10px', background: 'transparent', border: '1px solid var(--nx-border)', borderRadius: '6px', cursor: 'pointer' }} 
               onClick={() => setActiveView('agents')}
             >
               Manage agents →
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
           
-          <div className="agent-pods" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          <motion.div variants={itemVariants} className="agent-pods" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
             {PODS.map((p) => (
-              <div key={p.name} className="agent-pod" style={{
+              <motion.div 
+                key={p.name} 
+                className="agent-pod" 
+                whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+                style={{
                 background: 'var(--nx-card)', border: '1px solid var(--nx-border)',
                 borderRadius: '12px', padding: '16px'
               }}>
@@ -183,7 +212,13 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
                 </div>
                 {p.pct > 0 ? (
                   <div className="prog-bar" style={{ marginBottom: '6px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div className="prog-bar-fill" style={{ width: `${p.pct}%`, height: '100%', background: '#22d3ee' }} />
+                    <motion.div 
+                      className="prog-bar-fill" 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${p.pct}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      style={{ height: '100%', background: '#22d3ee' }} 
+                    />
                   </div>
                 ) : (
                   <div style={{ height: '8px' }} />
@@ -192,12 +227,12 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
                   <span style={{ color: 'var(--nx-text-muted)', fontFamily: 'monospace' }}>{p.detail}</span>
                   {p.pct > 0 && <span style={{ color: '#22d3ee', fontFamily: 'monospace' }}>{p.pct}%</span>}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Task Feed */}
-          <div className="task-feed" style={{ marginBottom: '32px' }}>
+          <motion.div variants={itemVariants} className="task-feed" style={{ marginBottom: '32px' }}>
             <div className="task-feed-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
               <span className="section-title" style={{ fontSize: '16px', fontWeight: 600 }}>Task Feed</span>
               <span style={{ fontSize: '10px', color: 'var(--nx-text-muted)', fontFamily: 'monospace' }}>
@@ -215,7 +250,10 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
               </thead>
               <tbody>
                 {TASKS.map((t) => (
-                  <tr key={t.name} style={{ borderBottom: '1px solid var(--nx-border)' }}>
+                  <motion.tr 
+                    key={t.name} 
+                    whileHover={{ backgroundColor: 'var(--bg-hover)' }}
+                    style={{ borderBottom: '1px solid var(--nx-border)' }}>
                     <td style={{ padding: '12px 8px', fontSize: '12px' }}>{t.name}</td>
                     <td style={{ padding: '12px 8px' }}>
                       <span style={{
@@ -232,14 +270,14 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
                         color: t.status === 'running' ? '#22d3ee' : '#f59e0b'
                       }}>{t.status.toUpperCase()}</span>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </motion.div>
 
           {/* Model Usage */}
-          <div className="dash-bottom">
+          <motion.div variants={itemVariants} className="dash-bottom">
             <div className="model-usage-card" style={{
               background: 'var(--nx-card)', border: '1px solid var(--nx-border)',
               borderRadius: '12px', padding: '16px'
@@ -249,7 +287,13 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
                 <div key={m.name} className="model-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                   <div className="model-row-name" style={{ width: '90px', fontSize: '12px' }}>{m.name}</div>
                   <div className="model-row-bar" style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div className="model-row-fill" style={{ width: `${m.pct}%`, height: '100%', background: m.color }} />
+                    <motion.div 
+                      className="model-row-fill" 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${m.pct}%` }}
+                      transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+                      style={{ height: '100%', background: m.color }} 
+                    />
                   </div>
                   <div style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--nx-text-muted)', width: '36px', textAlign: 'right' }}>
                     {m.tokens}
@@ -258,8 +302,8 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
                 </div>
               ))}
             </div>
-          </div>
-        </>
+          </motion.div>
+        </motion.div>
       ) : (
         <div style={{ textAlign: 'center', padding: '60px', color: 'var(--nx-text-muted)' }}>
           No data available

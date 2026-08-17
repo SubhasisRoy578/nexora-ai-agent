@@ -14,7 +14,7 @@ import uuid
 
 from app.agents.learning_engine import learning_engine
 from app.tasks.task_service import task_repository
-from app.llm.llm_router import ask_llm
+from app.llm.llm_router import ask_llm, stream_llm
 from app.agents.planner_agent import create_plan
 from app.agents.critic_agent import CriticAgent
 from app.agents.agent_factory import agent_factory
@@ -491,6 +491,150 @@ class AgentOrchestrator:
 
             await task_repository.fail_task(task_id, str(e))
             raise e
+
+    # ==================================================
+    # STREAMING EXECUTION (Phase 3)
+    # ==================================================
+
+    async def stream_run(
+        self,
+        goal: str,
+        user_id: str = "default",
+        provider: str = None
+    ):
+        task_id = str(uuid.uuid4())
+        await task_repository.create_task(
+            task_id=task_id,
+            user_id=user_id,
+            goal=goal
+        )
+
+        try:
+            yield "> 🔍 **Analyzing request and checking user preferences...** \n\n"
+            await asyncio.sleep(0.1)
+            try:
+                await self.preference_memory.extract_and_store_preferences(
+                    user_id=user_id,
+                    message=goal,
+                    provider=provider
+                )
+            except Exception as e:
+                print(f"[Preference Extraction Error]: {e}")
+
+            gathered_context = await self.context_manager.gather_context(
+                user_id=user_id,
+                query=goal
+            )
+            memory_context = gathered_context.get("conversation_memory", "")
+            user_preferences = gathered_context.get("user_preferences", [])
+            pref_text = self.context_manager.format_preferences_for_prompt(user_preferences)
+            rag_context = gathered_context.get("rag_context", "")
+
+            if rag_context:
+                yield "> 📚 **Retrieved knowledge base context from documents.** \n\n"
+                await asyncio.sleep(0.1)
+
+            yield "> 🧠 **Planning execution and identifying tools...** \n\n"
+            await asyncio.sleep(0.1)
+
+            try:
+                execution_plan = await planning_engine.decompose_goal(
+                    goal, provider=provider, context=gathered_context
+                )
+                plan = execution_plan.to_user_facing_steps()
+                plan_execution = await task_execution_engine.execute_plan(
+                    execution_plan, user_id=user_id, context_data=gathered_context
+                )
+            except Exception as e:
+                print(f"[Planning Engine Error]: {e}")
+                plan = create_plan(goal)
+                plan_execution = None
+
+            tool_output = self.tool_caller.execute_tools(goal)
+            selected_tools = tool_output.get("tools_selected", [])
+            selected_tool = selected_tools[0] if selected_tools else self.detect_tool(goal)
+            tool_result = tool_output.get("results", [None])[0] if tool_output.get("results") else None
+            web_search_context = self.tool_caller.format_tool_results_for_prompt(tool_output)
+
+            if not web_search_context and selected_tool:
+                try:
+                    legacy_res = self.registry.execute(selected_tool, goal)
+                    if selected_tool == "web_search" and isinstance(legacy_res, dict):
+                        web_search_context = legacy_res.get("formatted", "")
+                        tool_result = legacy_res
+                except Exception as e:
+                    print(f"[Tool Legacy Fallback Error]: {e}")
+
+            if selected_tool:
+                yield f"> 🛠️ **Executed tool:** `{selected_tool}` \n\n"
+                await asyncio.sleep(0.1)
+
+            agent_results = await self.execute_agents(goal, user_id)
+            if agent_results:
+                yield f"> 🤖 **Delegated to {len(agent_results)} specialized agents for research.** \n\n"
+                await asyncio.sleep(0.1)
+
+            dynamic_agent_result = await self.execute_dynamic_agent(goal)
+
+            critic_result = await self.critic_agent.run(goal, agent_results)
+
+            agent_summary = ""
+            for ar in agent_results:
+                if ar.get("success") and ar.get("result"):
+                    res = ar["result"]
+                    content = (res.get("formatted_results") or str(res))[:500] if isinstance(res, dict) else str(res)[:500]
+                    agent_summary += f"\n[{ar['agent']}]:\n{content}\n"
+
+            use_rag = isinstance(rag_context, str) and len(rag_context.strip()) > 50
+
+            llm_prompt = prompt_manager.render(
+                "orchestrator_synthesis",
+                memory_context=memory_context if memory_context else "No previous conversation.",
+                pref_text=pref_text if pref_text else "",
+                goal=goal,
+                live_results=f"Live Web Search / Tool Results:\n{web_search_context}" if web_search_context else "",
+                doc_context=f"Document Context:\n{rag_context}" if use_rag else "",
+                agent_summary=agent_summary if agent_summary else "No additional agent findings.",
+                dynamic_result=str(dynamic_agent_result.get("result", ""))[:400],
+                critic_feedback=critic_result.get("feedback", "")
+            )
+
+            llm_response = ""
+            try:
+                async for token in stream_llm(llm_prompt, provider=provider):
+                    llm_response += token
+                    yield token
+            except Exception as e:
+                error_msg = "\n\nI'm having trouble generating a response. Please try again in a moment."
+                llm_response += error_msg
+                yield error_msg
+                print(f"[LLM Error]: {e}")
+
+            await self.memory.store_memory_async(
+                user_id=user_id,
+                role="user",
+                content=goal
+            )
+
+            await self.memory.store_memory_async(
+                user_id=user_id,
+                role="assistant",
+                content=llm_response
+            )
+
+            result = {
+                "task_id": task_id,
+                "final_answer": llm_response,
+                "provider_used": provider or "groq (default)",
+                "goal": goal,
+                "timestamp": str(datetime.utcnow()),
+            }
+
+            await task_repository.complete_task(task_id, result)
+
+        except Exception as e:
+            await task_repository.fail_task(task_id, str(e))
+            yield f"\n\nAn error occurred during execution: {str(e)}"
 
     # ==================================================
     # TASK STATUS

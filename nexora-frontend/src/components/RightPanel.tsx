@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // Local types instead of missing dashboardStore
 interface Agent {
@@ -106,14 +107,17 @@ export default function RightPanel() {
         borderBottom: '1px solid var(--nx-border, #1E2433)',
       }}>
         <span className="rp-title" style={{ fontWeight: 600, fontSize: '14px' }}>Agent Activity</span>
-        <span className="badge badge-live rp-live" style={{
+        <motion.span 
+          animate={{ opacity: [1, 0.5, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="badge badge-live rp-live" style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 600,
           background: 'rgba(239,68,68,0.15)', color: '#ef4444'
         }}>
           <span className="dot dot-red" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444' }} />
           LIVE
-        </span>
+        </motion.span>
       </div>
 
       <div className="rp-body" style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
@@ -121,9 +125,15 @@ export default function RightPanel() {
         <div className="section-label" style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--nx-text-muted, #6B7280)', marginBottom: '8px' }}>
           Running agents ({runningAgents.length})
         </div>
+        <AnimatePresence>
         {runningAgents.length > 0 ? (
           runningAgents.map((a) => (
-            <div key={a.id} className="agent-row" style={{
+            <motion.div 
+              key={a.id} 
+              initial={{ opacity: 0, height: 0, scale: 0.95 }}
+              animate={{ opacity: 1, height: 'auto', scale: 1 }}
+              exit={{ opacity: 0, height: 0, scale: 0.95 }}
+              className="agent-row" style={{
               background: 'var(--nx-card, #11141C)',
               border: '1px solid var(--nx-border, #1E2433)',
               borderRadius: '8px',
@@ -141,29 +151,36 @@ export default function RightPanel() {
               <div className="agent-detail">
                 <span style={{ fontSize: '10px', color: 'var(--nx-text-muted, #6B7280)' }}>{a.currentTask || 'Processing...'}</span>
               </div>
-            </div>
+            </motion.div>
           ))
         ) : (
           <div style={{ fontSize: '11px', color: 'var(--nx-text-muted, #6B7280)', padding: '8px 0' }}>No running agents</div>
         )}
+        </AnimatePresence>
 
         {/* Running Tasks */}
         <div className="section-label" style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--nx-text-muted, #6B7280)', marginTop: '16px', marginBottom: '8px' }}>
           Running tasks ({runningTasks.length})
         </div>
         <div className="nx-card" style={{ background: 'var(--nx-card, #11141C)', border: '1px solid var(--nx-border, #1E2433)', borderRadius: '8px', padding: '8px 12px' }}>
+          <AnimatePresence>
           {runningTasks.length > 0 ? (
             runningTasks.map((t) => (
-              <div key={t.id} className="task-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--nx-border, #1E2433)' }}>
+              <motion.div 
+                key={t.id} 
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="task-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--nx-border, #1E2433)' }}>
                 <div className="task-name" style={{ fontSize: '11px' }}>{t.title}</div>
                 <div className="task-step" style={{ fontSize: '9px', color: 'var(--nx-text-muted, #6B7280)', fontFamily: 'monospace' }}>
                   {t.durationMs ? `${t.durationMs}ms` : 'Running...'}
                 </div>
-              </div>
+              </motion.div>
             ))
           ) : (
             <div style={{ fontSize: '10px', color: 'var(--nx-text-muted, #6B7280)' }}>No running tasks</div>
           )}
+          </AnimatePresence>
         </div>
 
         {/* Notifications */}
@@ -172,13 +189,16 @@ export default function RightPanel() {
         </div>
         <div className="nx-card" style={{ background: 'var(--nx-card, #11141C)', border: '1px solid var(--nx-border, #1E2433)', borderRadius: '8px', padding: '8px 12px' }}>
           {notifs.map((n, i) => (
-            <div key={i} className="notif-item" style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: i < notifs.length - 1 ? '1px solid var(--nx-border, #1E2433)' : 'none' }}>
+            <motion.div 
+              key={i} 
+              whileHover={{ x: 2, backgroundColor: 'rgba(255,255,255,0.02)' }}
+              className="notif-item" style={{ display: 'flex', gap: '10px', padding: '8px 4px', borderRadius: '4px', borderBottom: i < notifs.length - 1 ? '1px solid var(--nx-border, #1E2433)' : 'none' }}>
               <div className="notif-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', marginTop: '2px', background: n.color, boxShadow: `0 0 5px ${n.color}` }} />
               <div style={{ flex: 1 }}>
                 <div className="notif-text" style={{ fontSize: '11px', marginBottom: '2px' }}>{n.text}</div>
                 <div className="notif-time" style={{ fontSize: '9px', color: 'var(--nx-text-muted, #6B7280)' }}>{n.time}</div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
