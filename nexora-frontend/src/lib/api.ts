@@ -2,7 +2,7 @@
 
 import { logger } from './logger'
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'
 const BASE = API_BASE
 
 const getHeaders = (token?: string) => ({
