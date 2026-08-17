@@ -27,7 +27,7 @@ export default function KnowledgeView() {
     setLoading(true)
     setError(null)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'
       let documentsData: Document[] = []
       
       if (apiUrl) {
@@ -61,7 +61,7 @@ export default function KnowledgeView() {
     setUploading(true)
     setError(null)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'
       
       if (apiUrl) {
         const formData = new FormData()
@@ -97,7 +97,7 @@ export default function KnowledgeView() {
     
     setLoading(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'
       let results: Document[] = []
       
       if (apiUrl) {

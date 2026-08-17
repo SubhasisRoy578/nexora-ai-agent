@@ -149,7 +149,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ loading: true, error: null, currentSessionId: sessionId })
     try {
       // Fetch messages from backend API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/sessions/${sessionId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'}/sessions/${sessionId}`, {
         headers: {
           'Content-Type': 'application/json',
         },

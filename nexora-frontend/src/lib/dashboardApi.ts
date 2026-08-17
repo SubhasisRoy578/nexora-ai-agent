@@ -1,6 +1,6 @@
 import { AgentName, Provider, TaskStatus } from '@/store/dashboardStore';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://nexora-ai-agent.onrender.com';
 
 // ── Response types ────────────────────────────────────────────────────────
 

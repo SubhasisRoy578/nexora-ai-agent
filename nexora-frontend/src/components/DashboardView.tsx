@@ -37,7 +37,7 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
         }
         
         // Try to fetch from real API if available
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'
         if (apiUrl) {
           try {
             const response = await fetch(`${apiUrl}/analytics/metrics`)
@@ -67,7 +67,7 @@ export default function DashboardView({ setActiveView }: DashboardViewProps) {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com'
         if (apiUrl) {
           const response = await fetch(`${apiUrl}/agents`)
           if (response.ok) {

@@ -11,9 +11,9 @@ export interface AgentEvent {
 }
 
 export function connectAgentSocket(onEvent: (e: AgentEvent) => void) {
-  // Use secure WebSocket in production, fallback to localhost in dev
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = process.env.NEXT_PUBLIC_API_URL || 'localhost:8000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://nexora-ai-agent.onrender.com';
+  const host = apiUrl.replace(/^https?:\/\//, '');
+  const protocol = apiUrl.startsWith('https') || window.location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${protocol}://${host}/ws/agent-activity`);
   
   ws.onmessage = (msg) => {
